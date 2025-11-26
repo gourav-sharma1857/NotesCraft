@@ -1,70 +1,94 @@
-# Getting Started with Create React App
+# NoteCraft (Notes app)
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+NoteCraft is a lightweight note-taking web app built with React and Firebase. It lets users sign in with Google, create notes with multiple sections, add text/code/bullet content blocks, style titles and sections, and persist notes to Cloud Firestore.
 
-## Available Scripts
+## Features
 
-In the project directory, you can run:
+- Google sign-in using Firebase Authentication
+- Create, update and delete notes
+- Notes have multiple sections; each section can include text, code, or bullet blocks
+- Code blocks support language selection and copy/delete actions
+- Per-note background (solid color or gradient) and title/section styling
+- Real-time sync with Firestore for the signed-in user
 
-### `npm start`
+## Tech Stack
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+- React (Create React App)
+- Firebase Authentication
+- Cloud Firestore
+- Vanilla CSS for styling 
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## Quick Start
 
-### `npm test`
+Prerequisites:
+- Node.js (>= 14) and npm
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+Install and run locally:
 
-### `npm run build`
+```powershell
+cd notes-app
+npm install
+npm start
+```
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+Open `http://localhost:3000` (or the port shown) in your browser.
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+## Firebase Configuration
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+This app expects environment variables to be set in a `.env` file placed in the `notes-app/` directory. Create a `.env` with the following keys (replace values with your Firebase project's values):
 
-### `npm run eject`
+```env
+REACT_APP_FIREBASE_API_KEY=your_api_key
+REACT_APP_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+REACT_APP_FIREBASE_PROJECT_ID=your_project_id
+REACT_APP_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
+REACT_APP_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+REACT_APP_FIREBASE_APP_ID=your_app_id
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+Important:
+- After creating/updating `.env`, restart the dev server (`npm start`) so CRA picks up the changes.
+- In Firebase Console enable **Authentication -> Sign-in method -> Google** and **Firestore** (in test or appropriate rules for development).
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+## File Overview
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+- `src/firebase.js` — initializes Firebase using `process.env.REACT_APP_*` variables
+- `src/App.js` — app root: auth state, notes listing, CRUD operations, and passes handlers to `NoteWorkspace`
+- `src/components/NoteWorkspace.js` — main editor: sections, content blocks, styling UI
+- `src/components/Sidebar.js` — sections list and navigation
+- `src/components/Login.js` — Google sign-in UI
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+## Deploying to GitHub Pages
 
-## Learn More
+This project can be published to GitHub Pages using the `gh-pages` package. The repository owner is `gourav-sharma1857` and the repo is `NotesCraft`, so the app will be available at:
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+```
+https://gourav-sharma1857.github.io/NotesCraft
+```
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+Steps to publish:
 
-### Code Splitting
+1. Ensure the `homepage` field in `notes-app/package.json` is set to the URL above (already configured).
+2. Install the deploy tool (local dev dependency):
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+```powershell
+cd notes-app
+npm install --save-dev gh-pages
+```
 
-### Analyzing the Bundle Size
+3. Build and deploy:
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+```powershell
+cd notes-app
+npm run deploy
+```
 
-### Making a Progressive Web App
+Notes:
+- The `deploy` script runs `npm run build` and then publishes the `build` folder to a `gh-pages` branch.
+- If you host from a custom domain or username page, adjust the `homepage` field accordingly.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
 
-### Advanced Configuration
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
 
-### Deployment
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
 
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
