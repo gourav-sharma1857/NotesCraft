@@ -1,13 +1,13 @@
 {
   "files": {
     "main.css": "/NotesCraft/static/css/main.69d48338.css",
-    "main.js": "/NotesCraft/static/js/main.9d3bf714.js",
+    "main.js": "/NotesCraft/static/js/main.83b31429.js",
     "index.html": "/NotesCraft/index.html",
     "main.69d48338.css.map": "/NotesCraft/static/css/main.69d48338.css.map",
-    "main.9d3bf714.js.map": "/NotesCraft/static/js/main.9d3bf714.js.map"
+    "main.83b31429.js.map": "/NotesCraft/static/js/main.83b31429.js.map"
   },
   "entrypoints": [
     "static/css/main.69d48338.css",
-    "static/js/main.9d3bf714.js"
+    "static/js/main.83b31429.js"
   ]
 }
