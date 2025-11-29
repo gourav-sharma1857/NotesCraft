@@ -119,23 +119,41 @@ function CodeBlock({ content, language, onChange, onDelete }) {
   );
 }
 
-// ============ CONTENT BLOCK ============
+// ============ CONTENT BLOCK (MODIFIED) ============
 function ContentBlock({ block, onChange, onDelete }) {
   const [showToolbar, setShowToolbar] = useState(false);
+  // 1. Read the collapsed state from block.style, default to false (expanded)
+  const isCollapsed = block.style?.isCollapsed || false;
+
+  // 2. New function to toggle the collapse state and update the block data
+  const toggleCollapse = () => {
+    onChange({ style: { ...block.style, isCollapsed: !isCollapsed } });
+  };
 
   const toggleStyle = (styleProp) => {
     const current = block.style?.[styleProp];
     onChange({ style: { ...block.style, [styleProp]: !current } });
   };
 
+  // 3. Conditional styles applied to the textarea
   const textStyle = {
     fontWeight: block.style?.bold ? 'bold' : 'normal',
     fontStyle: block.style?.italic ? 'italic' : 'normal',
     textDecoration: block.style?.underline ? 'underline' : 'none',
     color: block.style?.color || '#334155',
-  };
+    // Collapse/Expand styles: Limit to 1 line and hide overflow when collapsed
+    maxHeight: isCollapsed ? '1.5em' : 'none', 
+    overflow: isCollapsed ? 'hidden' : 'visible',
+    resize: isCollapsed ? 'none' : 'vertical', // Disable manual resize when collapsed
+    lineHeight: '1.5em', // Important for consistent height calculation
+    whiteSpace: isCollapsed ? 'nowrap' : 'pre-wrap', // Force text onto a single line when collapsed
+    textOverflow: isCollapsed ? 'ellipsis' : 'initial', // Show "..." when truncated
+  };
+  
+  const collapseIcon = isCollapsed ? '⬇️' : '⬆️'; // Icon changes based on state
 
   return (
+    // Note: To position the collapse button correctly, the .content-block needs 'position: relative' in CSS.
     <div className="content-block" onMouseEnter={() => setShowToolbar(true)} onMouseLeave={() => setShowToolbar(false)}>
       {block.type === 'bullet' && <span className="bullet">•</span>}
       <textarea
@@ -144,7 +162,20 @@ function ContentBlock({ block, onChange, onDelete }) {
         onChange={e => onChange({ content: e.target.value })}
         placeholder={block.type === 'bullet' ? 'Bullet point...' : 'Type here...'}
         style={textStyle}
+        readOnly={isCollapsed} // Optional: Prevent editing when collapsed
       />
+      
+      {/* 4. The new collapse/expand button */}
+      <button 
+        className="collapse-button" 
+        onClick={toggleCollapse} 
+        title={isCollapsed ? 'Expand Content' : 'Collapse Content'}
+        // Simple inline style to position the button if CSS isn't available
+        style={{ position: 'absolute', top: '5px', right: '5px', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: '1.2em' }}
+      >
+          {collapseIcon}
+      </button>
+
       {showToolbar && (
         <div className="content-toolbar">
           <button className={block.style?.bold ? 'active' : ''} onClick={() => toggleStyle('bold')}><b>B</b></button>
