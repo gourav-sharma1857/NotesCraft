@@ -6,31 +6,45 @@ export default function Sidebar({
   selectedSectionId, 
   onSelectSection, 
   onAddSection, 
-  onGoHome 
+  onGoHome,
+  onMoveSection,
+  collapsed,
+  onToggleCollapse
 }) {
+  if (collapsed) {
+    return null;
+  }
+
   return (
     <aside className="sidebar">
-      <button className="sidebar-back-btn" onClick={onGoHome}>
-        ← Back to Notes
-      </button>
+      <div className="sidebar-header">
+        <button className="back-btn" onClick={onGoHome}>
+          ← Back
+        </button>
+      </div>
       
-      <div className="sidebar-title">SECTIONS</div>
+      <div className="sidebar-label">SECTIONS</div>
       
-      <nav className="sidebar-nav">
+      <nav className="sidebar-sections">
         {sections?.map((section, index) => (
           <div
             key={section.id}
-            className={`sidebar-item ${selectedSectionId === section.id ? 'active' : ''}`}
-            onClick={() => onSelectSection(section.id)}
+            className={`sidebar-section ${selectedSectionId === section.id ? 'active' : ''}`}
           >
-            <span className="sidebar-item-num">{index + 1}</span>
-            <span className="sidebar-item-title">{section.title || 'Untitled'}</span>
+            <div className="section-main" onClick={() => onSelectSection(section.id)}>
+              <span className="section-num">{index + 1}</span>
+              <span className="section-name">{section.title || 'Untitled'}</span>
+            </div>
+            <div className="section-arrows">
+              <button onClick={(e) => { e.stopPropagation(); onMoveSection(index, -1); }} disabled={index === 0}>↑</button>
+              <button onClick={(e) => { e.stopPropagation(); onMoveSection(index, 1); }} disabled={index === sections.length - 1}>↓</button>
+            </div>
           </div>
         ))}
       </nav>
       
-      <button className="sidebar-add-btn" onClick={onAddSection}>
-        + Add Section
+      <button className="add-section-btn" onClick={onAddSection}>
+        + New Section
       </button>
     </aside>
   );
