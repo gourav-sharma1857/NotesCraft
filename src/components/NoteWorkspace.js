@@ -6,24 +6,39 @@ import './NoteWorkspace.css';
 function StylePanel({ target, note, currentSection, onUpdate, onUpdateSection, onClose }) {
   const fonts = ['Inter', 'Georgia', 'Playfair Display', 'Roboto Mono', 'Arial', 'Times New Roman', 'Courier New', 'Verdana'];
   const sizes = ['12px', '14px', '16px', '18px', '20px', '24px', '28px', '32px', '40px', '48px'];
-  const gradients = [
+  const bgColors = [
+  '#0f172a', 
+  '#111827', 
+  '#020617', 
+  '#171717', 
+  '#064e3b', 
+  '#4c1d95', 
+  '#1e1b4b', 
+  '#1c1917', 
+  '#ffffff', 
+  '#f8fafc',
+  '#f1f5f9',
+  '#fef3c7',
+  '#dcfce7',
+  '#dbeafe',
+  '#fce7f3',
+  '#ecfdf5'
+];  
+  const bgGradients = [
     { name: 'Ocean', value: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' },
     { name: 'Sunset', value: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' },
     { name: 'Forest', value: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)' },
-    { name: 'Night', value: 'linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 100%)' },
+    { name: 'Night', value: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)' },
     { name: 'Sky', value: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)' },
     { name: 'Fire', value: 'linear-gradient(135deg, #f12711 0%, #f5af19 100%)' },
-    { name: 'Purple', value: 'linear-gradient(135deg, #7f00ff 0%, #e100ff 100%)' },
-    { name: 'Mint', value: 'linear-gradient(135deg, #00b09b 0%, #96c93d 100%)' },
-    { name: 'Gourav-masti', value: 'linear-gradient(135deg, #3e4b4aff 0%, #44699dff 100%)' },
-
-  ];
-  const colors = [
-    '#1e293b', '#334155', '#0f172a', '#475569', '#64748b',
-    '#dc2626', '#ef4444', '#f97316', '#f59e0b', '#eab308',
-    '#22c55e', '#10b981', '#059669', '#14b8a6', '#06b6d4',
-    '#0ea5e9', '#3b82f6', '#2563eb', '#6366f1', '#8b5cf6',
-    '#a855f7', '#d946ef', '#ec4899', '#f43f5e', '#ffffff'
+    { name: 'Deep Space', value: 'linear-gradient(135deg, #000000 0%, #434343 100%)' },
+  { name: 'Midnight City', value: 'linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)' },
+  { name: 'Abyss', value: 'linear-gradient(135deg, #000428 0%, #004e92 100%)' },
+  { name: 'Eclipse', value: 'linear-gradient(135deg, #141e30 0%, #243b55 100%)' },
+  { name: 'Dark Purple', value: 'linear-gradient(135deg, #200122 0%, #6f0000 100%)' },
+  { name: 'Obsidian', value: 'linear-gradient(135deg, #232526 0%, #414345 100%)' },
+  { name: 'Evergreen Dark', value: 'linear-gradient(135deg, #051937 0%, #004d7a 100%)' },
+  { name: 'Royal Dark', value: 'linear-gradient(135deg, #141e30 0%, #243b55 100%)' },
   ];
 
   if (target === 'background') {
