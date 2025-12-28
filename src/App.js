@@ -12,6 +12,7 @@ function App() {
   const [selectedNote, setSelectedNote] = useState(null);
   const [selectedSectionId, setSelectedSectionId] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [confirmDelete, setConfirmDelete] = useState(null); 
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -77,10 +78,15 @@ function App() {
     await updateDoc(noteRef, { ...cleanUpdates, updatedAt: new Date().toISOString() });
   };
 
-  const deleteNote = async (noteId) => {
-    if (!window.confirm('Delete this note?')) return;
-    await deleteDoc(doc(db, 'notes', noteId));
-    if (selectedNote?.id === noteId) setSelectedNote(null);
+  const requestDeleteNote = (note) => {
+    setConfirmDelete({
+      title: 'Delete Note?',
+      message: `Are you sure you want to delete "${note.title || 'Untitled'}"? This action cannot be undone.`,
+      onConfirm: async () => {
+        await deleteDoc(doc(db, 'notes', note.id));
+        if (selectedNote?.id === note.id) setSelectedNote(null);
+      }
+    });
   };
 
   const openNote = (note) => {
@@ -95,9 +101,7 @@ function App() {
 
   if (loading) return <div className="loading">Loading...</div>;
 
-  if (!user) {
-    return <Login onLogin={signIn} />;
-  }
+  if (!user) return <Login onLogin={signIn} />;
 
   if (selectedNote) {
     return (
@@ -136,12 +140,34 @@ function App() {
                   {note.title || 'Untitled'}
                 </h3>
                 <p>{note.sections?.length || 0} sections</p>
-                <button className="delete-btn" onClick={(e) => { e.stopPropagation(); deleteNote(note.id); }}>🗑️</button>
+                <button
+                  className="delete-btn"
+                  onClick={(e) => { e.stopPropagation(); requestDeleteNote(note); }}
+                >
+                  🗑️
+                </button>
               </div>
             ))
           )}
         </div>
       </main>
+
+      {/* ✅ Confirm delete modal */}
+      {confirmDelete && (
+        <div className="confirm-overlay" onClick={() => setConfirmDelete(null)}>
+          <div className="confirm-modal" onClick={e => e.stopPropagation()}>
+            <h3>{confirmDelete.title}</h3>
+            <p>{confirmDelete.message}</p>
+            <div className="confirm-actions">
+              <button className="cancel-btn" onClick={() => setConfirmDelete(null)}>Cancel</button>
+              <button className="danger-btn" onClick={async () => {
+                await confirmDelete.onConfirm();
+                setConfirmDelete(null);
+              }}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

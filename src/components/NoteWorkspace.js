@@ -4,48 +4,29 @@ import { doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import Sidebar from './Sidebar';
 import './NoteWorkspace.css';
 
-// ============ RICH TEXT BLOCK ============
 function RichTextBlock({ block, onChange, onDelete, onMoveUp, onMoveDown, canMoveUp, canMoveDown }) {
   const editorRef = useRef(null);
   const [showToolbar, setShowToolbar] = useState(false);
-  const isUpdating = useRef(false);
 
   const fonts = ['Inter', 'Georgia', 'Playfair Display', 'Roboto Mono', 'Arial', 'Courier New', 'Verdana', 'Times New Roman'];
   const sizes = ['12px', '14px', '16px', '18px', '20px', '24px', '28px', '32px', '40px', '48px'];
 
   useEffect(() => {
-    if (editorRef.current && block.content !== undefined && !isUpdating.current) {
-      if (editorRef.current.innerHTML !== block.content) {
-        const selection = window.getSelection();
-        const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
-        const start = range ? range.startOffset : 0;
-        
-        editorRef.current.innerHTML = block.content;
-        
-        // Restore cursor position
-        if (range && editorRef.current.firstChild) {
-          try {
-            const newRange = document.createRange();
-            const textNode = editorRef.current.firstChild;
-            newRange.setStart(textNode, Math.min(start, textNode.length || 0));
-            newRange.collapse(true);
-            selection.removeAllRanges();
-            selection.addRange(newRange);
-          } catch (e) {
-            // Ignore cursor restoration errors
-          }
-        }
-      }
+    if (editorRef.current && block.content !== editorRef.current.innerHTML) {
+      editorRef.current.innerHTML = block.content || '';
     }
   }, [block.content]);
 
   const handleInput = () => {
     if (editorRef.current) {
-      isUpdating.current = true;
       onChange({ content: editorRef.current.innerHTML });
-      setTimeout(() => {
-        isUpdating.current = false;
-      }, 0);
+    }
+  };
+
+
+  const handleBlur = () => {
+    if (editorRef.current) {
+      onChange({ content: editorRef.current.innerHTML });
     }
   };
 
@@ -63,6 +44,7 @@ function RichTextBlock({ block, onChange, onDelete, onMoveUp, onMoveDown, canMov
       handleInput();
     }
   };
+  
 
   return (
     <div className="text-block" onMouseEnter={() => setShowToolbar(true)} onMouseLeave={() => setShowToolbar(false)}>
@@ -113,7 +95,7 @@ function RichTextBlock({ block, onChange, onDelete, onMoveUp, onMoveDown, canMov
         className="text-editor"
         contentEditable
         onInput={handleInput}
-        onBlur={handleInput}
+        onBlur={handleBlur}
         suppressContentEditableWarning
         data-placeholder="Start typing..."
       />
@@ -125,7 +107,7 @@ function RichTextBlock({ block, onChange, onDelete, onMoveUp, onMoveDown, canMov
 function CodeBlock({ block, onChange, onDelete, onMoveUp, onMoveDown, canMoveUp, canMoveDown }) {
   const [copied, setCopied] = useState(false);
   const textareaRef = useRef(null);
-  const languages = ['javascript', 'python', 'html', 'css', 'java', 'cpp', 'sql', 'bash', 'typescript', 'json', 'php', 'ruby'];
+  const languages = ['javascript', 'python', 'java', 'c++'];
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -140,12 +122,27 @@ function CodeBlock({ block, onChange, onDelete, onMoveUp, onMoveDown, canMoveUp,
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleDelete = () => {
+  onDelete();
+};
+
+
+  const handleChange = (e) => {
+    onChange({ ...block, content: e.target.value });
+    e.target.style.height = 'auto';
+    e.target.style.height = e.target.scrollHeight + 'px';
+  };
+
+  const handleBlur = (e) => {
+    onChange({ ...block, content: e.target.value });
+  };
+
   return (
     <div className="code-block">
       <div className="block-controls">
         <button className="control-btn" onClick={onMoveUp} disabled={!canMoveUp}>↑</button>
         <button className="control-btn" onClick={onMoveDown} disabled={!canMoveDown}>↓</button>
-        <button className="control-btn delete" onClick={onDelete}>×</button>
+        <button className="control-btn delete" onClick={handleDelete}>🗑️</button>
       </div>
 
       <div className="code-container">
@@ -153,19 +150,21 @@ function CodeBlock({ block, onChange, onDelete, onMoveUp, onMoveDown, canMoveUp,
           <select value={block.language || 'javascript'} onChange={e => onChange({ ...block, language: e.target.value })}>
             {languages.map(l => <option key={l} value={l}>{l}</option>)}
           </select>
-          <button className="copy-btn" onClick={handleCopy}>
-            {copied ? '✓ Copied' : '📋 Copy'}
-          </button>
+          <div className="code-actions">
+            <button className="copy-btn" onClick={handleCopy}>
+              {copied ? '✓ Copied' : '📋 Copy'}
+            </button>
+            <button className="delete-btn" onClick={handleDelete}>
+              🗑️ Delete
+            </button>
+          </div>
         </div>
         <textarea
           ref={textareaRef}
           className="code-textarea"
           value={block.content || ''}
-          onChange={e => {
-            onChange({ ...block, content: e.target.value });
-            e.target.style.height = 'auto';
-            e.target.style.height = e.target.scrollHeight + 'px';
-          }}
+          onChange={handleChange}
+          onBlur={handleBlur}
           placeholder="// Enter code..."
           spellCheck={false}
         />
@@ -177,6 +176,18 @@ function CodeBlock({ block, onChange, onDelete, onMoveUp, onMoveDown, canMoveUp,
 // ============ SUBHEADING BLOCK ============
 function SubheadingBlock({ block, onChange, onDelete, onMoveUp, onMoveDown, canMoveUp, canMoveDown }) {
   const [showTools, setShowTools] = useState(false);
+
+  const handleDelete = () => {
+    onDelete();
+  };
+
+  const handleChange = (e) => {
+    onChange({ ...block, content: e.target.value });
+  };
+
+  const handleBlur = (e) => {
+    onChange({ ...block, content: e.target.value });
+  };
 
   return (
     <div className="subheading-block" onMouseEnter={() => setShowTools(true)} onMouseLeave={() => setShowTools(false)}>
@@ -199,7 +210,8 @@ function SubheadingBlock({ block, onChange, onDelete, onMoveUp, onMoveDown, canM
       <input
         className="subheading-input"
         value={block.content || ''}
-        onChange={e => onChange({ ...block, content: e.target.value })}
+        onChange={handleChange}
+        onBlur={handleBlur}
         placeholder="Subheading..."
         style={{ color: block.style?.color || '#1e293b' }}
       />
@@ -209,10 +221,15 @@ function SubheadingBlock({ block, onChange, onDelete, onMoveUp, onMoveDown, canM
 
 // ============ MAIN WORKSPACE ============
 function NoteWorkspace({ note, selectedSectionId, onSelectSection, onUpdate, onGoHome }) {
+  const [confirmDelete, setConfirmDelete] = useState(null); 
   const [localNote, setLocalNote] = useState(note);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const requestDelete = ({ title, message, onConfirm }) => {
+  setConfirmDelete({ title, message, onConfirm });
+};
   const [saveStatus, setSaveStatus] = useState('saved');
   const [showBgPicker, setShowBgPicker] = useState(false);
+  const [customColor, setCustomColor] = useState('#ffffff');
   const isFirstRender = useRef(true);
   const saveTimeout = useRef(null);
 
@@ -294,23 +311,34 @@ function NoteWorkspace({ note, selectedSectionId, onSelectSection, onUpdate, onG
   };
 
   const deleteSection = (sectionId) => {
-    if (!window.confirm('Delete this section?')) return;
-    const sections = localNote.sections.filter(s => s.id !== sectionId);
-    updateNote({ sections });
-    if (selectedSectionId === sectionId) onSelectSection(sections[0]?.id || null);
-  };
+  const sections = localNote.sections.filter(s => s.id !== sectionId);
+  updateNote({ sections });
+  if (selectedSectionId === sectionId) {
+    onSelectSection(sections[0]?.id || null);
+  }
+};
+
+
+
 
   const addContent = (type) => {
-    if (!currentSection) return;
-    const newBlock = { 
-      id: Date.now().toString(), 
-      type, 
-      content: '', 
-      style: {},
-      language: type === 'code' ? 'javascript' : undefined
-    };
-    updateSection(currentSection.id, { content: [...(currentSection.content || []), newBlock] });
+  if (!currentSection) return;
+
+  const newBlock = {
+    id: Date.now().toString(),
+    type,
+    content: '',
+    style: {}
   };
+
+  if (type === 'code') {
+    newBlock.language = 'javascript';
+  }
+
+  updateSection(currentSection.id, {
+    content: [...(currentSection.content || []), newBlock]
+  });
+};
 
   const updateContent = (blockId, updates) => {
     if (!currentSection) return;
@@ -319,9 +347,12 @@ function NoteWorkspace({ note, selectedSectionId, onSelectSection, onUpdate, onG
   };
 
   const deleteContent = (blockId) => {
-    if (!currentSection) return;
-    updateSection(currentSection.id, { content: currentSection.content.filter(b => b.id !== blockId) });
-  };
+  if (!currentSection) return;
+  updateSection(currentSection.id, { 
+    content: currentSection.content.filter(b => b.id !== blockId) 
+  });
+};
+
 
   const moveContent = (blockIndex, direction) => {
     if (!currentSection) return;
@@ -333,7 +364,13 @@ function NoteWorkspace({ note, selectedSectionId, onSelectSection, onUpdate, onG
     updateSection(currentSection.id, { content });
   };
 
-  const bgColors = ['#ffffff', '#f8fafc', '#f1f5f9', '#fef3c7', '#dcfce7', '#dbeafe', '#fce7f3', '#ecfdf5'];
+  const bgColors = [
+    '#ffffff', '#f8fafc', '#f1f5f9', '#e2e8f0', 
+    '#fef3c7', '#dcfce7', '#dbeafe', '#fce7f3', '#ecfdf5',
+    '#1e293b', '#0f172a', '#1f2937', '#18181b', '#27272a', 
+    '#374151', '#422006', '#450a0a', '#4c0519'
+  ];
+  
   const bgGradients = [
     { name: 'Ocean', value: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' },
     { name: 'Sunset', value: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' },
@@ -341,6 +378,11 @@ function NoteWorkspace({ note, selectedSectionId, onSelectSection, onUpdate, onG
     { name: 'Night', value: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)' },
     { name: 'Sky', value: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)' },
     { name: 'Fire', value: 'linear-gradient(135deg, #f12711 0%, #f5af19 100%)' },
+    { name: 'Deep Sea', value: 'linear-gradient(135deg, #005C97 0%, #363795 100%)' },
+    { name: 'Cosmic', value: 'linear-gradient(135deg, #141e30 0%, #243b55 100%)' },
+    { name: 'Midnight', value: 'linear-gradient(135deg, #000428 0%, #004e92 100%)' },
+    { name: 'Purple', value: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' },
+    { name: 'Dark', value: 'linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)' },
   ];
 
   const getBg = () => localNote?.background || '#ffffff';
@@ -355,6 +397,7 @@ function NoteWorkspace({ note, selectedSectionId, onSelectSection, onUpdate, onG
         onGoHome={onGoHome}
         onMoveSection={moveSection}
         collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
       />
 
       <div className="workspace-main" style={{ background: getBg() }}>
@@ -374,21 +417,58 @@ function NoteWorkspace({ note, selectedSectionId, onSelectSection, onUpdate, onG
           <div className="bg-picker-overlay" onClick={() => setShowBgPicker(false)}>
             <div className="bg-picker-modal" onClick={e => e.stopPropagation()}>
               <h4>Background</h4>
-              <div className="bg-colors">
-                {bgColors.map(c => (
-                  <div key={c} className="bg-swatch" style={{ background: c }} 
-                    onClick={() => { updateNote({ background: c }); setShowBgPicker(false); }} />
-                ))}
+              
+              <div className="bg-section">
+                <h5>Solid Colors</h5>
+                <div className="bg-colors">
+                  {bgColors.map(c => (
+                    <div 
+                      key={c} 
+                      className={`bg-swatch ${getBg() === c ? 'active' : ''}`}
+                      style={{ background: c }} 
+                      onClick={() => { updateNote({ background: c }); setShowBgPicker(false); }} 
+                    />
+                  ))}
+                </div>
               </div>
-              <div className="bg-gradients">
-                {bgGradients.map(g => (
-                  <div key={g.name} className="bg-gradient" style={{ background: g.value }}
-                    onClick={() => { updateNote({ background: g.value }); setShowBgPicker(false); }}>
-                    {g.name}
-                  </div>
-                ))}
+
+              <div className="bg-section">
+                <h5>Custom Color</h5>
+                <div className="custom-color-picker">
+                  <input 
+                    type="color" 
+                    value={customColor} 
+                    onChange={(e) => setCustomColor(e.target.value)}
+                  />
+                  <input 
+                    type="text" 
+                    value={customColor} 
+                    onChange={(e) => setCustomColor(e.target.value)}
+                    placeholder="#ffffff"
+                  />
+                  <button onClick={() => { updateNote({ background: customColor }); setShowBgPicker(false); }}>
+                    Apply
+                  </button>
+                </div>
               </div>
-              <button onClick={() => setShowBgPicker(false)}>Close</button>
+              
+              <div className="bg-section">
+                <h5>Gradients</h5>
+                <div className="bg-gradients">
+                  {bgGradients.map(g => (
+                    <div 
+                      key={g.name} 
+                      className={`bg-gradient ${getBg() === g.value ? 'active' : ''}`}
+                      style={{ background: g.value }}
+                      onClick={() => { updateNote({ background: g.value }); setShowBgPicker(false); }}
+                    >
+                      {g.name}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <button className="close-btn" onClick={() => setShowBgPicker(false)}>Close</button>
             </div>
           </div>
         )}
@@ -398,6 +478,7 @@ function NoteWorkspace({ note, selectedSectionId, onSelectSection, onUpdate, onG
             className="note-title" 
             value={localNote?.title || ''} 
             onChange={e => updateNote({ title: e.target.value })} 
+            onBlur={e => updateNote({ title: e.target.value })}
             placeholder="Note Title"
           />
 
@@ -405,19 +486,29 @@ function NoteWorkspace({ note, selectedSectionId, onSelectSection, onUpdate, onG
             <>
               <div className="section-header">
                 <div className="section-moves">
-                  <button onClick={() => moveSection(currentSectionIndex, -1)} disabled={currentSectionIndex === 0}>↑</button>
-                  <button onClick={() => moveSection(currentSectionIndex, 1)} disabled={currentSectionIndex === localNote.sections.length - 1}>↓</button>
                 </div>
                 <input 
                   className="section-title" 
                   value={currentSection.title || ''} 
                   onChange={e => updateSection(currentSection.id, { title: e.target.value })} 
+                  onBlur={e => updateSection(currentSection.id, { title: e.target.value })}
                   placeholder="Section Title"
                 />
                 <div className="section-btns">
-                  <button onClick={() => addSection(currentSectionIndex)}>+ Above</button>
-                  <button onClick={() => addSection(currentSectionIndex + 1)}>+ Below</button>
-                  <button className="delete" onClick={() => deleteSection(currentSection.id)}>Delete</button>
+                  <button
+                    className="delete"
+                    onClick={() =>
+                      requestDelete({
+                        title: 'Delete section?',
+                        message: 'All blocks inside this section will be removed.',
+                        onConfirm: () => deleteSection(currentSection.id)
+                      })
+                    }
+                  >
+                    Delete
+                  </button>
+
+
                 </div>
               </div>
 
@@ -429,21 +520,44 @@ function NoteWorkspace({ note, selectedSectionId, onSelectSection, onUpdate, onG
                   if (block.type === 'code') {
                     return <CodeBlock key={block.id} block={block} 
                       onChange={(updates) => updateContent(block.id, updates)} 
-                      onDelete={() => deleteContent(block.id)}
+                      onDelete={() =>
+                        requestDelete({
+                          title: 'Delete block?',
+                          message: 'This action cannot be undone.',
+                          onConfirm: () => deleteContent(block.id)
+                        })
+                        }
+
                       onMoveUp={() => moveContent(index, -1)}
                       onMoveDown={() => moveContent(index, 1)}
                       canMoveUp={canMoveUp} canMoveDown={canMoveDown} />;
                   } else if (block.type === 'subheading') {
                     return <SubheadingBlock key={block.id} block={block}
-                      onChange={(updates) => updateContent(block.id, updates)}
-                      onDelete={() => deleteContent(block.id)}
-                      onMoveUp={() => moveContent(index, -1)}
-                      onMoveDown={() => moveContent(index, 1)}
-                      canMoveUp={canMoveUp} canMoveDown={canMoveDown} />;
+                            onChange={(updates) => updateContent(block.id, updates)}
+                            onDelete={() =>
+                              requestDelete({
+                                title: 'Delete block?',
+                                message: 'This action cannot be undone.',
+                                onConfirm: () => deleteContent(block.id)
+                              })
+                            }
+                            onMoveUp={() => moveContent(index, -1)}
+                            onMoveDown={() => moveContent(index, 1)}
+                            canMoveUp={canMoveUp}
+                            canMoveDown={canMoveDown}
+                          />
+
                   } else {
                     return <RichTextBlock key={block.id} block={block}
                       onChange={(updates) => updateContent(block.id, updates)}
-                      onDelete={() => deleteContent(block.id)}
+                      onDelete={() =>
+                            requestDelete({
+                              title: 'Delete block?',
+                              message: 'This action cannot be undone.',
+                              onConfirm: () => deleteContent(block.id)
+                            })
+                          }
+
                       onMoveUp={() => moveContent(index, -1)}
                       onMoveDown={() => moveContent(index, 1)}
                       canMoveUp={canMoveUp} canMoveDown={canMoveDown} />;
@@ -465,8 +579,44 @@ function NoteWorkspace({ note, selectedSectionId, onSelectSection, onUpdate, onG
           )}
         </div>
       </div>
+     {confirmDelete && (
+  <div
+    className="confirm-overlay"
+    onClick={() => setConfirmDelete(null)}
+  >
+    <div
+      className="confirm-modal"
+      onClick={e => e.stopPropagation()}
+    >
+      <h3>{confirmDelete.title}</h3>
+      <p>{confirmDelete.message}</p>
+
+      <div className="confirm-actions">
+        <button
+          className="cancel-btn"
+          onClick={() => setConfirmDelete(null)}
+        >
+          Cancel
+        </button>
+
+        <button
+          className="danger-btn"
+          onClick={() => {
+            confirmDelete.onConfirm();
+            setConfirmDelete(null);
+          }}
+        >
+          Delete
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+
     </div>
   );
 }
 
 export default NoteWorkspace;
+
