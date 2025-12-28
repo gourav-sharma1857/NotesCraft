@@ -7,44 +7,80 @@ import './NoteWorkspace.css';
 function RichTextBlock({ block, onChange, onDelete, onMoveUp, onMoveDown, canMoveUp, canMoveDown }) {
   const editorRef = useRef(null);
   const [showToolbar, setShowToolbar] = useState(false);
+  const isInternalChange = useRef(false);
 
   const fonts = ['Inter', 'Georgia', 'Playfair Display', 'Roboto Mono', 'Arial', 'Courier New', 'Verdana', 'Times New Roman'];
   const sizes = ['12px', '14px', '16px', '18px', '20px', '24px', '28px', '32px', '40px', '48px'];
 
   useEffect(() => {
-    if (editorRef.current && block.content !== editorRef.current.innerHTML) {
-      editorRef.current.innerHTML = block.content || '';
+    if (!editorRef.current) return;
+    
+    if (!isInternalChange.current) {
+      const currentContent = editorRef.current.innerHTML;
+      const newContent = block.content || '<br>';
+      
+      if (currentContent !== newContent && !editorRef.current.contains(document.activeElement)) {
+        editorRef.current.innerHTML = newContent;
+      }
     }
+    isInternalChange.current = false;
   }, [block.content]);
 
-  const handleInput = () => {
+  const saveContent = () => {
     if (editorRef.current) {
-      onChange({ content: editorRef.current.innerHTML });
+      isInternalChange.current = true;
+      const content = editorRef.current.innerHTML || '<br>';
+      onChange({ content });
     }
   };
 
+  const handleInput = () => {
+    saveContent();
+  };
 
   const handleBlur = () => {
-    if (editorRef.current) {
-      onChange({ content: editorRef.current.innerHTML });
-    }
+    saveContent();
   };
 
   const execCommand = (command, value = null) => {
+    const selection = window.getSelection();
+    const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+    
     document.execCommand(command, false, value);
+    
+    if (editorRef.current) {
+      isInternalChange.current = true;
+      const content = editorRef.current.innerHTML || '<br>';
+      onChange({ content });
+    }
+    
     editorRef.current?.focus();
-    handleInput();
   };
 
   const removeFormatting = () => {
     const selection = window.getSelection();
     if (selection.rangeCount > 0) {
       document.execCommand('removeFormat', false, null);
+      saveContent();
       editorRef.current?.focus();
-      handleInput();
     }
   };
-  
+
+  const handleFontChange = (font) => {
+    const selection = window.getSelection();
+    if (selection.rangeCount > 0 && !selection.isCollapsed) {
+      document.execCommand('fontName', false, font);
+      saveContent();
+    } else {
+      if (editorRef.current) {
+        editorRef.current.style.fontFamily = font;
+        onChange({
+          content: editorRef.current.innerHTML,
+          style: { ...block.style, fontFamily: font }
+        });
+      }
+    }
+  };
 
   return (
     <div className="text-block" onMouseEnter={() => setShowToolbar(true)} onMouseLeave={() => setShowToolbar(false)}>
@@ -66,24 +102,46 @@ function RichTextBlock({ block, onChange, onDelete, onMoveUp, onMoveDown, canMov
           <button onClick={() => execCommand('insertOrderedList')} title="Numbered">1.</button>
           <div className="toolbar-divider"></div>
           
-          <select onChange={(e) => { if(e.target.value) execCommand('fontName', e.target.value); }} value="">
+          <select
+            value={block.style?.fontFamily || ''}
+            onChange={(e) => {
+              if (e.target.value) {
+                handleFontChange(e.target.value);
+              }
+            }}
+          >
             <option value="">Font</option>
             {fonts.map(f => <option key={f} value={f}>{f}</option>)}
           </select>
-          
-          <select onChange={(e) => { if(e.target.value) execCommand('fontSize', e.target.value); }} value="">
+
+          <select 
+            onChange={(e) => { 
+              if (e.target.value) {
+                execCommand('fontSize', e.target.value);
+              }
+            }} 
+            value=""
+          >
             <option value="">Size</option>
             {sizes.map((s, i) => <option key={s} value={i+1}>{s}</option>)}
           </select>
           
           <div className="color-picker">
             <span>A</span>
-            <input type="color" onChange={(e) => execCommand('foreColor', e.target.value)} title="Text color" />
+            <input 
+              type="color" 
+              onChange={(e) => execCommand('foreColor', e.target.value)} 
+              title="Text color" 
+            />
           </div>
           
           <div className="color-picker">
             <span>🖍</span>
-            <input type="color" onChange={(e) => execCommand('hiliteColor', e.target.value)} title="Highlight" />
+            <input 
+              type="color" 
+              onChange={(e) => execCommand('hiliteColor', e.target.value)} 
+              title="Highlight" 
+            />
           </div>
           
           <button onClick={removeFormatting} title="Clear formatting" className="clear-fmt">✕</button>
@@ -98,6 +156,7 @@ function RichTextBlock({ block, onChange, onDelete, onMoveUp, onMoveDown, canMov
         onBlur={handleBlur}
         suppressContentEditableWarning
         data-placeholder="Start typing..."
+        style={{ fontFamily: block.style?.fontFamily || 'inherit' }}
       />
     </div>
   );
@@ -122,11 +181,6 @@ function CodeBlock({ block, onChange, onDelete, onMoveUp, onMoveDown, canMoveUp,
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleDelete = () => {
-  onDelete();
-};
-
-
   const handleChange = (e) => {
     onChange({ ...block, content: e.target.value });
     e.target.style.height = 'auto';
@@ -142,7 +196,7 @@ function CodeBlock({ block, onChange, onDelete, onMoveUp, onMoveDown, canMoveUp,
       <div className="block-controls">
         <button className="control-btn" onClick={onMoveUp} disabled={!canMoveUp}>↑</button>
         <button className="control-btn" onClick={onMoveDown} disabled={!canMoveDown}>↓</button>
-        <button className="control-btn delete" onClick={handleDelete}>🗑️</button>
+        <button className="control-btn delete" onClick={onDelete}>×</button>
       </div>
 
       <div className="code-container">
@@ -153,9 +207,6 @@ function CodeBlock({ block, onChange, onDelete, onMoveUp, onMoveDown, canMoveUp,
           <div className="code-actions">
             <button className="copy-btn" onClick={handleCopy}>
               {copied ? '✓ Copied' : '📋 Copy'}
-            </button>
-            <button className="delete-btn" onClick={handleDelete}>
-              🗑️ Delete
             </button>
           </div>
         </div>
@@ -176,10 +227,6 @@ function CodeBlock({ block, onChange, onDelete, onMoveUp, onMoveDown, canMoveUp,
 // ============ SUBHEADING BLOCK ============
 function SubheadingBlock({ block, onChange, onDelete, onMoveUp, onMoveDown, canMoveUp, canMoveDown }) {
   const [showTools, setShowTools] = useState(false);
-
-  const handleDelete = () => {
-    onDelete();
-  };
 
   const handleChange = (e) => {
     onChange({ ...block, content: e.target.value });
@@ -225,22 +272,21 @@ function NoteWorkspace({ note, selectedSectionId, onSelectSection, onUpdate, onG
   const [localNote, setLocalNote] = useState(note);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const requestDelete = ({ title, message, onConfirm }) => {
-  setConfirmDelete({ title, message, onConfirm });
-};
+    setConfirmDelete({ title, message, onConfirm });
+  };
   const [saveStatus, setSaveStatus] = useState('saved');
   const [showBgPicker, setShowBgPicker] = useState(false);
   const [customColor, setCustomColor] = useState('#ffffff');
   const isFirstRender = useRef(true);
   const saveTimeout = useRef(null);
 
-  // Listen to Firebase changes
   useEffect(() => {
     if (!note.id) return;
 
-    const unsubscribe = onSnapshot(doc(db, 'notes', note.id), (doc) => {
-      if (doc.exists()) {
-        const data = doc.data();
-        setLocalNote({ id: doc.id, ...data });
+    const unsubscribe = onSnapshot(doc(db, 'notes', note.id), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setLocalNote(prev => ({ ...prev, ...data }));
       }
     });
 
@@ -311,48 +357,46 @@ function NoteWorkspace({ note, selectedSectionId, onSelectSection, onUpdate, onG
   };
 
   const deleteSection = (sectionId) => {
-  const sections = localNote.sections.filter(s => s.id !== sectionId);
-  updateNote({ sections });
-  if (selectedSectionId === sectionId) {
-    onSelectSection(sections[0]?.id || null);
-  }
-};
-
-
-
-
-  const addContent = (type) => {
-  if (!currentSection) return;
-
-  const newBlock = {
-    id: Date.now().toString(),
-    type,
-    content: '',
-    style: {}
+    const sections = localNote.sections.filter(s => s.id !== sectionId);
+    updateNote({ sections });
+    if (selectedSectionId === sectionId) {
+      onSelectSection(sections[0]?.id || null);
+    }
   };
 
-  if (type === 'code') {
-    newBlock.language = 'javascript';
-  }
+  const addContent = (type) => {
+    if (!currentSection) return;
 
-  updateSection(currentSection.id, {
-    content: [...(currentSection.content || []), newBlock]
-  });
-};
+    const newBlock = {
+      id: Date.now().toString(),
+      type,
+      content: '',
+      style: {}
+    };
+
+    if (type === 'code') {
+      newBlock.language = 'javascript';
+    }
+
+    updateSection(currentSection.id, {
+      content: [...(currentSection.content || []), newBlock]
+    });
+  };
 
   const updateContent = (blockId, updates) => {
     if (!currentSection) return;
-    const content = currentSection.content.map(b => b.id === blockId ? { ...b, ...updates } : b);
+    const content = currentSection.content.map(b => 
+      b.id === blockId ? { ...b, ...updates, style: { ...b.style, ...updates.style } } : b
+    );
     updateSection(currentSection.id, { content });
   };
 
   const deleteContent = (blockId) => {
-  if (!currentSection) return;
-  updateSection(currentSection.id, { 
-    content: currentSection.content.filter(b => b.id !== blockId) 
-  });
-};
-
+    if (!currentSection) return;
+    updateSection(currentSection.id, { 
+      content: currentSection.content.filter(b => b.id !== blockId) 
+    });
+  };
 
   const moveContent = (blockIndex, direction) => {
     if (!currentSection) return;
@@ -507,8 +551,6 @@ function NoteWorkspace({ note, selectedSectionId, onSelectSection, onUpdate, onG
                   >
                     Delete
                   </button>
-
-
                 </div>
               </div>
 
@@ -526,38 +568,35 @@ function NoteWorkspace({ note, selectedSectionId, onSelectSection, onUpdate, onG
                           message: 'This action cannot be undone.',
                           onConfirm: () => deleteContent(block.id)
                         })
-                        }
-
+                      }
                       onMoveUp={() => moveContent(index, -1)}
                       onMoveDown={() => moveContent(index, 1)}
                       canMoveUp={canMoveUp} canMoveDown={canMoveDown} />;
                   } else if (block.type === 'subheading') {
                     return <SubheadingBlock key={block.id} block={block}
-                            onChange={(updates) => updateContent(block.id, updates)}
-                            onDelete={() =>
-                              requestDelete({
-                                title: 'Delete block?',
-                                message: 'This action cannot be undone.',
-                                onConfirm: () => deleteContent(block.id)
-                              })
-                            }
-                            onMoveUp={() => moveContent(index, -1)}
-                            onMoveDown={() => moveContent(index, 1)}
-                            canMoveUp={canMoveUp}
-                            canMoveDown={canMoveDown}
-                          />
-
+                      onChange={(updates) => updateContent(block.id, updates)}
+                      onDelete={() =>
+                        requestDelete({
+                          title: 'Delete block?',
+                          message: 'This action cannot be undone.',
+                          onConfirm: () => deleteContent(block.id)
+                        })
+                      }
+                      onMoveUp={() => moveContent(index, -1)}
+                      onMoveDown={() => moveContent(index, 1)}
+                      canMoveUp={canMoveUp}
+                      canMoveDown={canMoveDown}
+                    />;
                   } else {
                     return <RichTextBlock key={block.id} block={block}
                       onChange={(updates) => updateContent(block.id, updates)}
                       onDelete={() =>
-                            requestDelete({
-                              title: 'Delete block?',
-                              message: 'This action cannot be undone.',
-                              onConfirm: () => deleteContent(block.id)
-                            })
-                          }
-
+                        requestDelete({
+                          title: 'Delete block?',
+                          message: 'This action cannot be undone.',
+                          onConfirm: () => deleteContent(block.id)
+                        })
+                      }
                       onMoveUp={() => moveContent(index, -1)}
                       onMoveDown={() => moveContent(index, 1)}
                       canMoveUp={canMoveUp} canMoveDown={canMoveDown} />;
@@ -579,44 +618,41 @@ function NoteWorkspace({ note, selectedSectionId, onSelectSection, onUpdate, onG
           )}
         </div>
       </div>
-     {confirmDelete && (
-  <div
-    className="confirm-overlay"
-    onClick={() => setConfirmDelete(null)}
-  >
-    <div
-      className="confirm-modal"
-      onClick={e => e.stopPropagation()}
-    >
-      <h3>{confirmDelete.title}</h3>
-      <p>{confirmDelete.message}</p>
-
-      <div className="confirm-actions">
-        <button
-          className="cancel-btn"
+      {confirmDelete && (
+        <div
+          className="confirm-overlay"
           onClick={() => setConfirmDelete(null)}
         >
-          Cancel
-        </button>
+          <div
+            className="confirm-modal"
+            onClick={e => e.stopPropagation()}
+          >
+            <h3>{confirmDelete.title}</h3>
+            <p>{confirmDelete.message}</p>
 
-        <button
-          className="danger-btn"
-          onClick={() => {
-            confirmDelete.onConfirm();
-            setConfirmDelete(null);
-          }}
-        >
-          Delete
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+            <div className="confirm-actions">
+              <button
+                className="cancel-btn"
+                onClick={() => setConfirmDelete(null)}
+              >
+                Cancel
+              </button>
 
-
+              <button
+                className="danger-btn"
+                onClick={() => {
+                  confirmDelete.onConfirm();
+                  setConfirmDelete(null);
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 export default NoteWorkspace;
-
