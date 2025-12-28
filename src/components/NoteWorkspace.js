@@ -1,159 +1,208 @@
 import React, { useState, useEffect, useRef } from 'react';
-import Sidebar from '../components/Sidebar';
+import { db } from '../firebase';
+import { doc, updateDoc, onSnapshot } from 'firebase/firestore';
+import Sidebar from './Sidebar';
 import './NoteWorkspace.css';
 
-// ============ STYLE PANEL ============
-function StylePanel({ target, note, currentSection, onUpdate, onUpdateSection, onClose }) {
-  const fonts = ['Inter', 'Georgia', 'Playfair Display', 'Roboto Mono', 'Arial', 'Times New Roman'];
-  const sizes = ['14px', '16px', '18px', '20px', '24px', '28px', '32px', '40px', '48px'];
-  const gradients = [
-    { name: 'Ocean', value: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' },
-    { name: 'Sunset', value: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' },
-    { name: 'Forest', value: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)' },
-    { name: 'Night', value: 'linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 100%)' },
-    { name: 'Sky', value: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)' },
-  ];
-  const colors = ['#1e293b', '#334155', '#0f172a', '#dc2626', '#2563eb', '#059669', '#7c3aed', '#db2777'];
+// ============ RICH TEXT BLOCK ============
+function RichTextBlock({ block, onChange, onDelete, onMoveUp, onMoveDown, canMoveUp, canMoveDown }) {
+  const editorRef = useRef(null);
+  const [showToolbar, setShowToolbar] = useState(false);
+  const isUpdating = useRef(false);
 
-  if (target === 'background') {
-    return (
-      <div className="style-panel-overlay" onClick={onClose}>
-        <div className="style-panel" onClick={e => e.stopPropagation()}>
-          <h3>Background</h3>
-          <div className="style-section">
-            <label>Solid Colors</label>
-            <div className="color-grid">
-              {['#ffffff', '#f8fafc', '#f1f5f9', '#fef3c7', '#dcfce7', '#dbeafe', '#fce7f3'].map(c => (
-                <div key={c} className={`color-swatch ${note.background?.value === c ? 'active' : ''}`}
-                  style={{ background: c }} onClick={() => onUpdate({ background: { type: 'solid', value: c } })} />
-              ))}
-            </div>
-          </div>
-          <div className="style-section">
-            <label>Gradients</label>
-            <div className="gradient-grid">
-              {gradients.map(g => (
-                <div key={g.name} className={`gradient-swatch ${note.background?.value === g.value ? 'active' : ''}`}
-                  style={{ background: g.value }} onClick={() => onUpdate({ background: { type: 'gradient', value: g.value } })}>
-                  <span>{g.name}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <button className="btn btn-secondary" onClick={onClose}>Close</button>
-        </div>
-      </div>
-    );
-  }
+  const fonts = ['Inter', 'Georgia', 'Playfair Display', 'Roboto Mono', 'Arial', 'Courier New', 'Verdana', 'Times New Roman'];
+  const sizes = ['12px', '14px', '16px', '18px', '20px', '24px', '28px', '32px', '40px', '48px'];
 
-  const style = target === 'title' ? note.titleStyle : currentSection?.titleStyle;
-  const updateStyle = (updates) => {
-    if (target === 'title') {
-      onUpdate({ titleStyle: { ...note.titleStyle, ...updates } });
-    } else {
-      onUpdateSection({ titleStyle: { ...currentSection?.titleStyle, ...updates } });
+  useEffect(() => {
+    if (editorRef.current && block.content !== undefined && !isUpdating.current) {
+      if (editorRef.current.innerHTML !== block.content) {
+        const selection = window.getSelection();
+        const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+        const start = range ? range.startOffset : 0;
+        
+        editorRef.current.innerHTML = block.content;
+        
+        // Restore cursor position
+        if (range && editorRef.current.firstChild) {
+          try {
+            const newRange = document.createRange();
+            const textNode = editorRef.current.firstChild;
+            newRange.setStart(textNode, Math.min(start, textNode.length || 0));
+            newRange.collapse(true);
+            selection.removeAllRanges();
+            selection.addRange(newRange);
+          } catch (e) {
+            // Ignore cursor restoration errors
+          }
+        }
+      }
+    }
+  }, [block.content]);
+
+  const handleInput = () => {
+    if (editorRef.current) {
+      isUpdating.current = true;
+      onChange({ content: editorRef.current.innerHTML });
+      setTimeout(() => {
+        isUpdating.current = false;
+      }, 0);
+    }
+  };
+
+  const execCommand = (command, value = null) => {
+    document.execCommand(command, false, value);
+    editorRef.current?.focus();
+    handleInput();
+  };
+
+  const removeFormatting = () => {
+    const selection = window.getSelection();
+    if (selection.rangeCount > 0) {
+      document.execCommand('removeFormat', false, null);
+      editorRef.current?.focus();
+      handleInput();
     }
   };
 
   return (
-    <div className="style-panel-overlay" onClick={onClose}>
-      <div className="style-panel" onClick={e => e.stopPropagation()}>
-        <h3>{target === 'title' ? 'Title Style' : 'Section Style'}</h3>
-        <div className="style-section">
-          <label>Font Family</label>
-          <select value={style?.fontFamily || 'Inter'} onChange={e => updateStyle({ fontFamily: e.target.value })}>
+    <div className="text-block" onMouseEnter={() => setShowToolbar(true)} onMouseLeave={() => setShowToolbar(false)}>
+      <div className="block-controls">
+        <button className="control-btn" onClick={onMoveUp} disabled={!canMoveUp}>↑</button>
+        <button className="control-btn" onClick={onMoveDown} disabled={!canMoveDown}>↓</button>
+        <button className="control-btn delete" onClick={onDelete}>×</button>
+      </div>
+
+      {showToolbar && (
+        <div className="text-toolbar">
+          <button onClick={() => execCommand('undo')} title="Undo">↶</button>
+          <button onClick={() => execCommand('redo')} title="Redo">↷</button>
+          <div className="toolbar-divider"></div>
+          <button onClick={() => execCommand('bold')} title="Bold"><b>B</b></button>
+          <button onClick={() => execCommand('italic')} title="Italic"><i>I</i></button>
+          <button onClick={() => execCommand('underline')} title="Underline"><u>U</u></button>
+          <button onClick={() => execCommand('insertUnorderedList')} title="Bullet">•</button>
+          <button onClick={() => execCommand('insertOrderedList')} title="Numbered">1.</button>
+          <div className="toolbar-divider"></div>
+          
+          <select onChange={(e) => { if(e.target.value) execCommand('fontName', e.target.value); }} value="">
+            <option value="">Font</option>
             {fonts.map(f => <option key={f} value={f}>{f}</option>)}
           </select>
-        </div>
-        <div className="style-section">
-          <label>Font Size</label>
-          <select value={style?.fontSize || '24px'} onChange={e => updateStyle({ fontSize: e.target.value })}>
-            {sizes.map(s => <option key={s} value={s}>{s}</option>)}
+          
+          <select onChange={(e) => { if(e.target.value) execCommand('fontSize', e.target.value); }} value="">
+            <option value="">Size</option>
+            {sizes.map((s, i) => <option key={s} value={i+1}>{s}</option>)}
           </select>
-        </div>
-        <div className="style-section">
-          <label>Color</label>
-          <div className="color-grid">
-            {colors.map(c => (
-              <div key={c} className={`color-swatch ${style?.color === c ? 'active' : ''}`}
-                style={{ background: c }} onClick={() => updateStyle({ color: c })} />
-            ))}
+          
+          <div className="color-picker">
+            <span>A</span>
+            <input type="color" onChange={(e) => execCommand('foreColor', e.target.value)} title="Text color" />
           </div>
+          
+          <div className="color-picker">
+            <span>🖍</span>
+            <input type="color" onChange={(e) => execCommand('hiliteColor', e.target.value)} title="Highlight" />
+          </div>
+          
+          <button onClick={removeFormatting} title="Clear formatting" className="clear-fmt">✕</button>
         </div>
-        <button className="btn btn-secondary" onClick={onClose}>Close</button>
-      </div>
+      )}
+
+      <div
+        ref={editorRef}
+        className="text-editor"
+        contentEditable
+        onInput={handleInput}
+        onBlur={handleInput}
+        suppressContentEditableWarning
+        data-placeholder="Start typing..."
+      />
     </div>
   );
 }
 
 // ============ CODE BLOCK ============
-function CodeBlock({ content, language, onChange, onDelete }) {
+function CodeBlock({ block, onChange, onDelete, onMoveUp, onMoveDown, canMoveUp, canMoveDown }) {
   const [copied, setCopied] = useState(false);
-  const languages = ['javascript', 'python', 'html', 'css', 'java', 'cpp', 'sql', 'bash'];
+  const textareaRef = useRef(null);
+  const languages = ['javascript', 'python', 'html', 'css', 'java', 'cpp', 'sql', 'bash', 'typescript', 'json', 'php', 'ruby'];
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+    }
+  }, [block.content]);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(content);
+    navigator.clipboard.writeText(block.content || '');
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   return (
     <div className="code-block">
-      <div className="code-header">
-        <select value={language || 'javascript'} onChange={e => onChange(content, e.target.value)}>
-          {languages.map(l => <option key={l} value={l}>{l}</option>)}
-        </select>
-        <div className="code-actions">
-          <button onClick={handleCopy}>{copied ? '✓ Copied' : '📋 Copy'}</button>
-          <button onClick={onDelete}>🗑️</button>
-        </div>
+      <div className="block-controls">
+        <button className="control-btn" onClick={onMoveUp} disabled={!canMoveUp}>↑</button>
+        <button className="control-btn" onClick={onMoveDown} disabled={!canMoveDown}>↓</button>
+        <button className="control-btn delete" onClick={onDelete}>×</button>
       </div>
-      <textarea
-        className="code-textarea"
-        value={content}
-        onChange={e => onChange(e.target.value, language)}
-        placeholder="Enter code..."
-        spellCheck={false}
-      />
+
+      <div className="code-container">
+        <div className="code-header">
+          <select value={block.language || 'javascript'} onChange={e => onChange({ ...block, language: e.target.value })}>
+            {languages.map(l => <option key={l} value={l}>{l}</option>)}
+          </select>
+          <button className="copy-btn" onClick={handleCopy}>
+            {copied ? '✓ Copied' : '📋 Copy'}
+          </button>
+        </div>
+        <textarea
+          ref={textareaRef}
+          className="code-textarea"
+          value={block.content || ''}
+          onChange={e => {
+            onChange({ ...block, content: e.target.value });
+            e.target.style.height = 'auto';
+            e.target.style.height = e.target.scrollHeight + 'px';
+          }}
+          placeholder="// Enter code..."
+          spellCheck={false}
+        />
+      </div>
     </div>
   );
 }
 
-// ============ CONTENT BLOCK ============
-function ContentBlock({ block, onChange, onDelete }) {
-  const [showToolbar, setShowToolbar] = useState(false);
-
-  const toggleStyle = (styleProp) => {
-    const current = block.style?.[styleProp];
-    onChange({ style: { ...block.style, [styleProp]: !current } });
-  };
-
-  const textStyle = {
-    fontWeight: block.style?.bold ? 'bold' : 'normal',
-    fontStyle: block.style?.italic ? 'italic' : 'normal',
-    textDecoration: block.style?.underline ? 'underline' : 'none',
-    color: block.style?.color || '#334155',
-  };
+// ============ SUBHEADING BLOCK ============
+function SubheadingBlock({ block, onChange, onDelete, onMoveUp, onMoveDown, canMoveUp, canMoveDown }) {
+  const [showTools, setShowTools] = useState(false);
 
   return (
-    <div className="content-block" onMouseEnter={() => setShowToolbar(true)} onMouseLeave={() => setShowToolbar(false)}>
-      {block.type === 'bullet' && <span className="bullet">•</span>}
-      <textarea
-        className="content-textarea"
-        value={block.content}
-        onChange={e => onChange({ content: e.target.value })}
-        placeholder={block.type === 'bullet' ? 'Bullet point...' : 'Type here...'}
-        style={textStyle}
-      />
-      {showToolbar && (
-        <div className="content-toolbar">
-          <button className={block.style?.bold ? 'active' : ''} onClick={() => toggleStyle('bold')}><b>B</b></button>
-          <button className={block.style?.italic ? 'active' : ''} onClick={() => toggleStyle('italic')}><i>I</i></button>
-          <button className={block.style?.underline ? 'active' : ''} onClick={() => toggleStyle('underline')}><u>U</u></button>
-          <input type="color" value={block.style?.color || '#334155'} onChange={e => onChange({ style: { ...block.style, color: e.target.value } })} />
-          <button onClick={onDelete}>🗑️</button>
+    <div className="subheading-block" onMouseEnter={() => setShowTools(true)} onMouseLeave={() => setShowTools(false)}>
+      <div className="block-controls">
+        <button className="control-btn" onClick={onMoveUp} disabled={!canMoveUp}>↑</button>
+        <button className="control-btn" onClick={onMoveDown} disabled={!canMoveDown}>↓</button>
+        <button className="control-btn delete" onClick={onDelete}>×</button>
+      </div>
+
+      {showTools && (
+        <div className="subheading-toolbar">
+          <div className="color-picker">
+            <span>Color</span>
+            <input type="color" value={block.style?.color || '#1e293b'} 
+              onChange={(e) => onChange({ ...block, style: { ...block.style, color: e.target.value } })} />
+          </div>
         </div>
       )}
+
+      <input
+        className="subheading-input"
+        value={block.content || ''}
+        onChange={e => onChange({ ...block, content: e.target.value })}
+        placeholder="Subheading..."
+        style={{ color: block.style?.color || '#1e293b' }}
+      />
     </div>
   );
 }
@@ -161,31 +210,82 @@ function ContentBlock({ block, onChange, onDelete }) {
 // ============ MAIN WORKSPACE ============
 function NoteWorkspace({ note, selectedSectionId, onSelectSection, onUpdate, onGoHome }) {
   const [localNote, setLocalNote] = useState(note);
-  const [showStylePanel, setShowStylePanel] = useState(false);
-  const [styleTarget, setStyleTarget] = useState(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [saveStatus, setSaveStatus] = useState('saved');
+  const [showBgPicker, setShowBgPicker] = useState(false);
   const isFirstRender = useRef(true);
+  const saveTimeout = useRef(null);
 
-  useEffect(() => { setLocalNote(note); }, [note.id]);
-
+  // Listen to Firebase changes
   useEffect(() => {
-    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    if (!note.id) return;
+
+    const unsubscribe = onSnapshot(doc(db, 'notes', note.id), (doc) => {
+      if (doc.exists()) {
+        const data = doc.data();
+        setLocalNote({ id: doc.id, ...data });
+      }
+    });
+
+    return () => unsubscribe();
+  }, [note.id]);
+
+  // Auto-save to Firebase
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+
     setSaveStatus('unsaved');
-    const timer = setTimeout(async () => {
+
+    if (saveTimeout.current) {
+      clearTimeout(saveTimeout.current);
+    }
+
+    saveTimeout.current = setTimeout(async () => {
       setSaveStatus('saving');
-      await onUpdate(localNote);
-      setSaveStatus('saved');
-    }, 1500);
-    return () => clearTimeout(timer);
-  }, [localNote]);
+      try {
+        await updateDoc(doc(db, 'notes', localNote.id), {
+          title: localNote.title || '',
+          background: localNote.background || '#ffffff',
+          sections: localNote.sections || [],
+          updatedAt: new Date()
+        });
+        setSaveStatus('saved');
+      } catch (error) {
+        console.error('Error saving:', error);
+        setSaveStatus('error');
+      }
+    }, 1000);
+
+    return () => {
+      if (saveTimeout.current) {
+        clearTimeout(saveTimeout.current);
+      }
+    };
+  }, [localNote.title, localNote.background, localNote.sections, localNote.id]);
 
   const updateNote = (updates) => setLocalNote(prev => ({ ...prev, ...updates }));
   const currentSection = localNote?.sections?.find(s => s.id === selectedSectionId);
+  const currentSectionIndex = localNote?.sections?.findIndex(s => s.id === selectedSectionId);
 
-  const addSection = () => {
-    const newSection = { id: Date.now().toString(), title: 'New Section', titleStyle: { fontFamily: 'Inter', fontSize: '24px', color: '#334155' }, content: [] };
-    updateNote({ sections: [...(localNote.sections || []), newSection] });
+  const addSection = (atIndex = -1) => {
+    const newSection = { id: Date.now().toString(), title: 'New Section', content: [] };
+    const sections = [...(localNote.sections || [])];
+    if (atIndex >= 0) sections.splice(atIndex, 0, newSection);
+    else sections.push(newSection);
+    updateNote({ sections });
     onSelectSection(newSection.id);
+  };
+
+  const moveSection = (fromIndex, direction) => {
+    const toIndex = fromIndex + direction;
+    if (toIndex < 0 || toIndex >= localNote.sections.length) return;
+    const sections = [...localNote.sections];
+    const [moved] = sections.splice(fromIndex, 1);
+    sections.splice(toIndex, 0, moved);
+    updateNote({ sections });
   };
 
   const updateSection = (sectionId, updates) => {
@@ -194,6 +294,7 @@ function NoteWorkspace({ note, selectedSectionId, onSelectSection, onUpdate, onG
   };
 
   const deleteSection = (sectionId) => {
+    if (!window.confirm('Delete this section?')) return;
     const sections = localNote.sections.filter(s => s.id !== sectionId);
     updateNote({ sections });
     if (selectedSectionId === sectionId) onSelectSection(sections[0]?.id || null);
@@ -201,8 +302,13 @@ function NoteWorkspace({ note, selectedSectionId, onSelectSection, onUpdate, onG
 
   const addContent = (type) => {
     if (!currentSection) return;
-    const newBlock = { id: Date.now().toString(), type, content: '', style: {} };
-    if (type === 'code') newBlock.language = 'javascript';
+    const newBlock = { 
+      id: Date.now().toString(), 
+      type, 
+      content: '', 
+      style: {},
+      language: type === 'code' ? 'javascript' : undefined
+    };
     updateSection(currentSection.id, { content: [...(currentSection.content || []), newBlock] });
   };
 
@@ -217,71 +323,148 @@ function NoteWorkspace({ note, selectedSectionId, onSelectSection, onUpdate, onG
     updateSection(currentSection.id, { content: currentSection.content.filter(b => b.id !== blockId) });
   };
 
-  const getBackground = () => {
-    if (!localNote?.background) return '#ffffff';
-    return localNote.background.type === 'gradient' ? localNote.background.value : localNote.background.value || '#ffffff';
+  const moveContent = (blockIndex, direction) => {
+    if (!currentSection) return;
+    const toIndex = blockIndex + direction;
+    if (toIndex < 0 || toIndex >= currentSection.content.length) return;
+    const content = [...currentSection.content];
+    const [moved] = content.splice(blockIndex, 1);
+    content.splice(toIndex, 0, moved);
+    updateSection(currentSection.id, { content });
   };
 
+  const bgColors = ['#ffffff', '#f8fafc', '#f1f5f9', '#fef3c7', '#dcfce7', '#dbeafe', '#fce7f3', '#ecfdf5'];
+  const bgGradients = [
+    { name: 'Ocean', value: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' },
+    { name: 'Sunset', value: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' },
+    { name: 'Forest', value: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)' },
+    { name: 'Night', value: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)' },
+    { name: 'Sky', value: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)' },
+    { name: 'Fire', value: 'linear-gradient(135deg, #f12711 0%, #f5af19 100%)' },
+  ];
+
+  const getBg = () => localNote?.background || '#ffffff';
+
   return (
-    <div className="workspace-container">
+    <div className="workspace-layout">
       <Sidebar
         sections={localNote?.sections}
         selectedSectionId={selectedSectionId}
         onSelectSection={onSelectSection}
-        onAddSection={addSection}
+        onAddSection={() => addSection()}
         onGoHome={onGoHome}
+        onMoveSection={moveSection}
+        collapsed={sidebarCollapsed}
       />
 
-      <div className="workspace-main" style={{ background: getBackground() }}>
-        <div className="workspace-topbar">
+      <div className="workspace-main" style={{ background: getBg() }}>
+        <div className="top-bar">
+          <button className="menu-btn" onClick={() => setSidebarCollapsed(!sidebarCollapsed)}>
+            {sidebarCollapsed ? '☰' : '✕'}
+          </button>
           <span className={`save-status ${saveStatus}`}>
-            {saveStatus === 'saving' ? '⏳ Saving...' : saveStatus === 'saved' ? '✓ Saved' : '○ Unsaved'}
+            {saveStatus === 'saving' ? '⏳ Saving...' : saveStatus === 'saved' ? '✓ Saved' : saveStatus === 'error' ? '⚠ Error' : '○ Unsaved'}
           </span>
-          <button onClick={() => { setStyleTarget('title'); setShowStylePanel(true); }}>🎨 Title Style</button>
-          <button onClick={() => { setStyleTarget('background'); setShowStylePanel(true); }}>🖼️ Background</button>
+          <button className="bg-btn" onClick={() => setShowBgPicker(!showBgPicker)}>
+            🎨 Background
+          </button>
         </div>
 
-        <input className="workspace-title-input" value={localNote?.title || ''} onChange={e => updateNote({ title: e.target.value })} placeholder="Note Title..."
-          style={{ fontFamily: localNote?.titleStyle?.fontFamily, color: localNote?.titleStyle?.color, fontSize: localNote?.titleStyle?.fontSize }} />
-
-        {currentSection ? (
-          <div className="section-content">
-            <div className="section-header">
-              <input className="section-title-input" value={currentSection.title || ''} onChange={e => updateSection(currentSection.id, { title: e.target.value })} placeholder="Section Title..."
-                style={{ fontFamily: currentSection.titleStyle?.fontFamily, color: currentSection.titleStyle?.color }} />
-              <button onClick={() => { setStyleTarget('section'); setShowStylePanel(true); }}>🎨</button>
-              <button onClick={() => window.confirm('Delete section?') && deleteSection(currentSection.id)}>🗑️</button>
+        {showBgPicker && (
+          <div className="bg-picker-overlay" onClick={() => setShowBgPicker(false)}>
+            <div className="bg-picker-modal" onClick={e => e.stopPropagation()}>
+              <h4>Background</h4>
+              <div className="bg-colors">
+                {bgColors.map(c => (
+                  <div key={c} className="bg-swatch" style={{ background: c }} 
+                    onClick={() => { updateNote({ background: c }); setShowBgPicker(false); }} />
+                ))}
+              </div>
+              <div className="bg-gradients">
+                {bgGradients.map(g => (
+                  <div key={g.name} className="bg-gradient" style={{ background: g.value }}
+                    onClick={() => { updateNote({ background: g.value }); setShowBgPicker(false); }}>
+                    {g.name}
+                  </div>
+                ))}
+              </div>
+              <button onClick={() => setShowBgPicker(false)}>Close</button>
             </div>
-
-            <div className="content-blocks">
-              {currentSection.content?.map(block => (
-                block.type === 'code' ? (
-                  <CodeBlock key={block.id} content={block.content} language={block.language}
-                    onChange={(content, language) => updateContent(block.id, { content, language })} onDelete={() => deleteContent(block.id)} />
-                ) : (
-                  <ContentBlock key={block.id} block={block} onChange={(updates) => updateContent(block.id, updates)} onDelete={() => deleteContent(block.id)} />
-                )
-              ))}
-            </div>
-
-            <div className="add-content-bar">
-              <button onClick={() => addContent('text')}>📝 Text</button>
-              <button onClick={() => addContent('code')}>💻 Code</button>
-              <button onClick={() => addContent('bullet')}>• Bullet</button>
-            </div>
-          </div>
-        ) : (
-          <div className="no-section">
-            <p>No sections yet</p>
-            <button onClick={addSection}>Create First Section</button>
           </div>
         )}
-      </div>
 
-      {showStylePanel && (
-        <StylePanel target={styleTarget} note={localNote} currentSection={currentSection}
-          onUpdate={updateNote} onUpdateSection={(updates) => updateSection(currentSection?.id, updates)} onClose={() => setShowStylePanel(false)} />
-      )}
+        <div className="content-area">
+          <input 
+            className="note-title" 
+            value={localNote?.title || ''} 
+            onChange={e => updateNote({ title: e.target.value })} 
+            placeholder="Note Title"
+          />
+
+          {currentSection ? (
+            <>
+              <div className="section-header">
+                <div className="section-moves">
+                  <button onClick={() => moveSection(currentSectionIndex, -1)} disabled={currentSectionIndex === 0}>↑</button>
+                  <button onClick={() => moveSection(currentSectionIndex, 1)} disabled={currentSectionIndex === localNote.sections.length - 1}>↓</button>
+                </div>
+                <input 
+                  className="section-title" 
+                  value={currentSection.title || ''} 
+                  onChange={e => updateSection(currentSection.id, { title: e.target.value })} 
+                  placeholder="Section Title"
+                />
+                <div className="section-btns">
+                  <button onClick={() => addSection(currentSectionIndex)}>+ Above</button>
+                  <button onClick={() => addSection(currentSectionIndex + 1)}>+ Below</button>
+                  <button className="delete" onClick={() => deleteSection(currentSection.id)}>Delete</button>
+                </div>
+              </div>
+
+              <div className="blocks">
+                {currentSection.content?.map((block, index) => {
+                  const canMoveUp = index > 0;
+                  const canMoveDown = index < currentSection.content.length - 1;
+                  
+                  if (block.type === 'code') {
+                    return <CodeBlock key={block.id} block={block} 
+                      onChange={(updates) => updateContent(block.id, updates)} 
+                      onDelete={() => deleteContent(block.id)}
+                      onMoveUp={() => moveContent(index, -1)}
+                      onMoveDown={() => moveContent(index, 1)}
+                      canMoveUp={canMoveUp} canMoveDown={canMoveDown} />;
+                  } else if (block.type === 'subheading') {
+                    return <SubheadingBlock key={block.id} block={block}
+                      onChange={(updates) => updateContent(block.id, updates)}
+                      onDelete={() => deleteContent(block.id)}
+                      onMoveUp={() => moveContent(index, -1)}
+                      onMoveDown={() => moveContent(index, 1)}
+                      canMoveUp={canMoveUp} canMoveDown={canMoveDown} />;
+                  } else {
+                    return <RichTextBlock key={block.id} block={block}
+                      onChange={(updates) => updateContent(block.id, updates)}
+                      onDelete={() => deleteContent(block.id)}
+                      onMoveUp={() => moveContent(index, -1)}
+                      onMoveDown={() => moveContent(index, 1)}
+                      canMoveUp={canMoveUp} canMoveDown={canMoveDown} />;
+                  }
+                })}
+              </div>
+
+              <div className="add-block">
+                <button onClick={() => addContent('text')}>+ Text</button>
+                <button onClick={() => addContent('subheading')}>+ Subheading</button>
+                <button onClick={() => addContent('code')}>+ Code</button>
+              </div>
+            </>
+          ) : (
+            <div className="empty">
+              <h3>No sections yet</h3>
+              <button onClick={() => addSection()}>Create First Section</button>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
