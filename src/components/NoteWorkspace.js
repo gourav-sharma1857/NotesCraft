@@ -208,6 +208,12 @@ function CodeBlock({ block, onChange, onDelete, onMoveUp, onMoveDown, canMoveUp,
             <button className="copy-btn" onClick={handleCopy}>
               {copied ? '✓ Copied' : '📋 Copy'}
             </button>
+            <button
+              className="delete-code-btn"
+              onClick={() => onDelete(block.id)} // make sure onDelete is passed from parent
+            >
+              Delete
+            </button>
           </div>
         </div>
         <textarea

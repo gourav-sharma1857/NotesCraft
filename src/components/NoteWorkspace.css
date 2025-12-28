@@ -304,6 +304,7 @@
 
 /* Block Controls */
 .block-controls {
+  z-index: 10;
   position: absolute;
   left: -40px;
   top: 8px;
@@ -464,6 +465,7 @@
 
 /* Code Block */
 .code-block {
+  overflow: visible;
   position: relative;
   background: white;
   border-radius: 12px;
