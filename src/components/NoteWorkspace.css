@@ -528,13 +528,13 @@
 
 .code-textarea {
   width: 100%;
-  min-height: 120px;
+  min-height: 180px;
   padding: 16px;
   background: #0f172a;
   color: #4ade80;
   border: none;
   font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
-  font-size: 14px;
+  font-size: 18px;
   line-height: 1.6;
   resize: none;
   outline: none;
